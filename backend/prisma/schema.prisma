@@ -1,0 +1,417 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgvector(map: "vector", schema: "public"), pgcrypto(schema: "public")]
+}
+
+// ============================================
+// TENANTS & AUTH
+// ============================================
+
+model Tenant {
+  id                 String   @id @default(uuid()) @db.Uuid
+  name               String   @db.VarChar(255)
+  slug               String   @unique @db.VarChar(100)
+  plan               String   @default("standard") @db.VarChar(50)
+  subscriptionStatus String   @default("trialing") @map("subscription_status") @db.VarChar(30)
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  users               User[]
+  platformConnections PlatformConnection[]
+  products            Product[]
+  productVariants     ProductVariant[]
+  platformListings    PlatformListing[]
+  pricingRules        PricingRule[]
+  orders              Order[]
+  syncJobs            SyncJob[]
+  onboardingSessions  OnboardingSession[]
+  aiConversations     AiConversation[]
+
+  @@map("tenants")
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  email        String   @db.VarChar(255)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  fullName     String   @map("full_name") @db.VarChar(255)
+  role         String   @default("owner") @db.VarChar(50)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  aiConversations AiConversation[]
+
+  @@unique([tenantId, email])
+  @@map("users")
+}
+
+// ============================================
+// PLATFORM CONNECTIONS
+// ============================================
+
+enum PlatformType {
+  shopify
+  salla
+  woocommerce
+  amazon
+  noon
+  zid
+  tiktok_shop
+  ebay
+  etsy
+  walmart
+  mercadolibre
+  aliexpress
+  magento
+}
+
+model PlatformConnection {
+  id             String       @id @default(uuid()) @db.Uuid
+  tenantId       String       @map("tenant_id") @db.Uuid
+  platform       PlatformType
+  platformShopId String?      @map("platform_shop_id") @db.VarChar(255)
+  shopName       String?      @map("shop_name") @db.VarChar(255)
+  credentials    Json         @db.JsonB
+  scopes         String[]
+  status         String       @default("active") @db.VarChar(30)
+  tokenExpiresAt DateTime?    @map("token_expires_at") @db.Timestamptz()
+  lastSyncedAt   DateTime?    @map("last_synced_at") @db.Timestamptz()
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  tenant           Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  platformListings PlatformListing[]
+  webhookEvents    WebhookEvent[]
+  orders           Order[]
+  syncJobs         SyncJob[]
+  onboardingSessions OnboardingSession[] @relation("AnchorConnection")
+  onboardingProducts OnboardingProduct[]
+
+  @@unique([tenantId, platform, platformShopId])
+  @@index([tokenExpiresAt])
+  @@map("platform_connections")
+}
+
+// ============================================
+// PRODUCTS & VARIANTS
+// ============================================
+
+model Product {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  title       String   @db.VarChar(500)
+  description String?  @db.Text
+  brand       String?  @db.VarChar(255)
+  category    String?  @db.VarChar(255)
+  images      Json     @default("[]") @db.JsonB
+  attributes  Json     @default("{}") @db.JsonB
+  tags        String[] @default([])
+  status      String   @default("draft") @db.VarChar(30)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  variants         ProductVariant[]
+  platformListings PlatformListing[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("products")
+}
+
+model ProductVariant {
+  id                String   @id @default(uuid()) @db.Uuid
+  tenantId          String   @map("tenant_id") @db.Uuid
+  productId         String   @map("product_id") @db.Uuid
+  sku               String   @db.VarChar(100)
+  barcode           String?  @db.VarChar(100)
+  title             String?  @db.VarChar(500)
+  options           Json     @default("{}") @db.JsonB
+  weightGrams       Int?     @map("weight_grams")
+  basePrice         Decimal  @map("base_price") @db.Decimal(12, 2)
+  baseCurrency      String   @default("USD") @map("base_currency") @db.Char(3)
+  costPrice         Decimal? @map("cost_price") @db.Decimal(12, 2)
+  stockQuantity     Int      @default(0) @map("stock_quantity")
+  lowStockThreshold Int      @default(5) @map("low_stock_threshold")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product          Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  platformListings PlatformListing[]
+  orderItems       OrderItem[]
+
+  @@unique([tenantId, sku])
+  @@index([productId])
+  @@map("product_variants")
+}
+
+// ============================================
+// PLATFORM LISTINGS (SKU mapping)
+// ============================================
+
+model PlatformListing {
+  id                String   @id @default(uuid()) @db.Uuid
+  tenantId          String   @map("tenant_id") @db.Uuid
+  productId         String   @map("product_id") @db.Uuid
+  variantId         String   @map("variant_id") @db.Uuid
+  connectionId      String   @map("connection_id") @db.Uuid
+  platform          PlatformType
+  platformProductId String?  @map("platform_product_id") @db.VarChar(255)
+  platformVariantId String?  @map("platform_variant_id") @db.VarChar(255)
+  platformSku       String?  @map("platform_sku") @db.VarChar(255)
+  platformUrl       String?  @map("platform_url") @db.Text
+  listingStatus     String   @default("pending") @map("listing_status") @db.VarChar(30)
+  platformData      Json     @default("{}") @map("platform_data") @db.JsonB
+  lastPushedAt      DateTime? @map("last_pushed_at") @db.Timestamptz()
+  lastPulledAt      DateTime? @map("last_pulled_at") @db.Timestamptz()
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  tenant     Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product    Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant    ProductVariant     @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  connection PlatformConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@unique([connectionId, platformProductId, platformVariantId])
+  @@index([variantId])
+  @@index([connectionId])
+  @@map("platform_listings")
+}
+
+// ============================================
+// PRICING RULES
+// ============================================
+
+model PricingRule {
+  id         String       @id @default(uuid()) @db.Uuid
+  tenantId   String       @map("tenant_id") @db.Uuid
+  name       String       @db.VarChar(255)
+  ruleType   String       @map("rule_type") @db.VarChar(50)
+  platform   PlatformType?
+  conditions Json         @default("{}") @db.JsonB
+  adjustment Json         @db.JsonB
+  priority   Int          @default(0)
+  active     Boolean      @default(true)
+  startsAt   DateTime?    @map("starts_at") @db.Timestamptz()
+  endsAt     DateTime?    @map("ends_at") @db.Timestamptz()
+  createdAt  DateTime     @default(now()) @map("created_at") @db.Timestamptz()
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, active])
+  @@map("pricing_rules")
+}
+
+// ============================================
+// ORDERS
+// ============================================
+
+model Order {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  connectionId    String   @map("connection_id") @db.Uuid
+  platform        PlatformType
+  platformOrderId String   @map("platform_order_id") @db.VarChar(255)
+  status          String   @db.VarChar(50)
+  currency        String   @db.Char(3)
+  subtotal        Decimal  @db.Decimal(12, 2)
+  taxTotal        Decimal  @default(0) @map("tax_total") @db.Decimal(12, 2)
+  shippingTotal   Decimal  @default(0) @map("shipping_total") @db.Decimal(12, 2)
+  grandTotal      Decimal  @map("grand_total") @db.Decimal(12, 2)
+  customer        Json?    @db.JsonB
+  shippingAddress Json?    @map("shipping_address") @db.JsonB
+  placedAt        DateTime @map("placed_at") @db.Timestamptz()
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  tenant     Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  connection PlatformConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  items      OrderItem[]
+
+  @@unique([connectionId, platformOrderId])
+  @@index([tenantId, placedAt])
+  @@map("orders")
+}
+
+model OrderItem {
+  id          String  @id @default(uuid()) @db.Uuid
+  orderId     String  @map("order_id") @db.Uuid
+  variantId   String? @map("variant_id") @db.Uuid
+  platformSku String? @map("platform_sku") @db.VarChar(255)
+  title       String? @db.VarChar(500)
+  quantity    Int
+  unitPrice   Decimal @map("unit_price") @db.Decimal(12, 2)
+  totalPrice  Decimal @map("total_price") @db.Decimal(12, 2)
+
+  order   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variant ProductVariant? @relation(fields: [variantId], references: [id])
+
+  @@map("order_items")
+}
+
+// ============================================
+// WEBHOOK EVENTS
+// ============================================
+
+model WebhookEvent {
+  id             String   @id @default(uuid()) @db.Uuid
+  connectionId   String?  @map("connection_id") @db.Uuid
+  platform       PlatformType
+  eventType      String   @map("event_type") @db.VarChar(100)
+  idempotencyKey String   @map("idempotency_key") @db.VarChar(255)
+  headers        Json?    @db.JsonB
+  payload        Json     @db.JsonB
+  status         String   @default("received") @db.VarChar(30)
+  errorMessage   String?  @map("error_message") @db.Text
+  processedAt    DateTime? @map("processed_at") @db.Timestamptz()
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  connection PlatformConnection? @relation(fields: [connectionId], references: [id])
+
+  @@unique([platform, idempotencyKey])
+  @@index([status])
+  @@map("webhook_events")
+}
+
+// ============================================
+// SYNC JOBS
+// ============================================
+
+model SyncJob {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  connectionId String?   @map("connection_id") @db.Uuid
+  jobType      String    @map("job_type") @db.VarChar(50)
+  status       String    @default("queued") @db.VarChar(30)
+  progress     Json      @default("{\"total\": 0, \"completed\": 0}") @db.JsonB
+  errorLog     Json      @default("[]") @map("error_log") @db.JsonB
+  startedAt    DateTime? @map("started_at") @db.Timestamptz()
+  completedAt  DateTime? @map("completed_at") @db.Timestamptz()
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  tenant     Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  connection PlatformConnection? @relation(fields: [connectionId], references: [id])
+
+  @@index([tenantId, status])
+  @@map("sync_jobs")
+}
+
+// ============================================
+// ONBOARDING / SMART MATCH
+// ============================================
+
+model OnboardingSession {
+  id                  String    @id @default(uuid()) @db.Uuid
+  tenantId            String    @map("tenant_id") @db.Uuid
+  status              String    @default("importing") @db.VarChar(30)
+  anchorConnectionId  String?   @map("anchor_connection_id") @db.Uuid
+  totalProducts       Int       @default(0) @map("total_products")
+  matchedCount        Int       @default(0) @map("matched_count")
+  skippedCount        Int       @default(0) @map("skipped_count")
+  unmatchedCount      Int       @default(0) @map("unmatched_count")
+  startedAt           DateTime  @default(now()) @map("started_at") @db.Timestamptz()
+  completedAt         DateTime? @map("completed_at") @db.Timestamptz()
+
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  anchorConnection   PlatformConnection? @relation("AnchorConnection", fields: [anchorConnectionId], references: [id])
+  onboardingProducts OnboardingProduct[]
+  matchCandidates    MatchCandidate[]
+
+  @@index([tenantId])
+  @@map("onboarding_sessions")
+}
+
+model OnboardingProduct {
+  id                String   @id @default(uuid()) @db.Uuid
+  sessionId         String   @map("session_id") @db.Uuid
+  connectionId      String   @map("connection_id") @db.Uuid
+  platform          PlatformType
+  platformProductId String   @map("platform_product_id") @db.VarChar(255)
+  title             String?  @db.VarChar(500)
+  description       String?  @db.Text
+  price             Decimal? @db.Decimal(12, 2)
+  currency          String?  @db.Char(3)
+  sku               String?  @db.VarChar(255)
+  barcode           String?  @db.VarChar(100)
+  imageUrls         Json     @default("[]") @map("image_urls") @db.JsonB
+  attributes        Json     @default("{}") @db.JsonB
+  textEmbedding     String?  @map("text_embedding") @db.Text
+  imageEmbedding    String?  @map("image_embedding") @db.Text
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  session    OnboardingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  connection PlatformConnection @relation(fields: [connectionId], references: [id])
+
+  anchorCandidates    MatchCandidate[] @relation("AnchorProduct")
+  candidateForMatches MatchCandidate[] @relation("CandidateProduct")
+
+  @@index([sessionId])
+  @@map("onboarding_products")
+}
+
+model MatchCandidate {
+  id                 String    @id @default(uuid()) @db.Uuid
+  sessionId          String    @map("session_id") @db.Uuid
+  anchorProductId    String    @map("anchor_product_id") @db.Uuid
+  candidateProductId String    @map("candidate_product_id") @db.Uuid
+  rank               Int
+  textSimilarity     Float?    @map("text_similarity")
+  imageSimilarity    Float?    @map("image_similarity")
+  barcodeMatch       Boolean   @default(false) @map("barcode_match")
+  priceProximity     Float?    @map("price_proximity")
+  compositeScore     Float     @map("composite_score")
+  visionAnalysis     Json?     @map("vision_analysis") @db.JsonB
+  status             String    @default("pending") @db.VarChar(30)
+  decidedAt          DateTime? @map("decided_at") @db.Timestamptz()
+
+  session          OnboardingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  anchorProduct    OnboardingProduct @relation("AnchorProduct", fields: [anchorProductId], references: [id])
+  candidateProduct OnboardingProduct @relation("CandidateProduct", fields: [candidateProductId], references: [id])
+
+  @@unique([anchorProductId, candidateProductId])
+  @@index([anchorProductId, rank])
+  @@map("match_candidates")
+}
+
+// ============================================
+// AI ASSISTANT
+// ============================================
+
+model AiConversation {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  contextType String   @map("context_type") @db.VarChar(50)
+  contextRef  String?  @map("context_ref") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  tenant   Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user     User        @relation(fields: [userId], references: [id])
+  messages AiMessage[]
+
+  @@index([tenantId])
+  @@map("ai_conversations")
+}
+
+model AiMessage {
+  id              String   @id @default(uuid()) @db.Uuid
+  conversationId  String   @map("conversation_id") @db.Uuid
+  role            String   @db.VarChar(20)
+  content         String   @db.Text
+  contextSnapshot Json?    @map("context_snapshot") @db.JsonB
+  tokensUsed      Int?     @map("tokens_used")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  conversation AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@map("ai_messages")
+}

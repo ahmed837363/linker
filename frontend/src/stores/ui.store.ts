@@ -1,0 +1,19 @@
+import { create } from 'zustand';
+
+interface UiState {
+  sidebarCollapsed: boolean;
+  aiPanelOpen: boolean;
+  toggleSidebar: () => void;
+  setSidebarCollapsed: (v: boolean) => void;
+  toggleAiPanel: () => void;
+  setAiPanelOpen: (v: boolean) => void;
+}
+
+export const useUiStore = create<UiState>((set) => ({
+  sidebarCollapsed: false,
+  aiPanelOpen: false,
+  toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+  setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
+  toggleAiPanel: () => set((s) => ({ aiPanelOpen: !s.aiPanelOpen })),
+  setAiPanelOpen: (v) => set({ aiPanelOpen: v }),
+}));

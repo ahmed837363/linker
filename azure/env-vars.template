@@ -1,0 +1,173 @@
+# Environment Variables Template for Azure App Service
+
+## Copy this template and fill in values in Azure Portal
+
+**Backend App Service → Configuration → Application settings**
+
+### Core
+
+```
+NODE_ENV=production
+PORT=3000
+API_PREFIX=api/v1
+```
+
+### Database (from Step 3)
+
+```
+DATABASE_URL=postgresql://linkerpro:YourStrongPassword123!@linker-pro-db.postgres.database.azure.com:5432/linker_pro?sslmode=require
+```
+
+### Redis (from Step 4)
+
+```
+REDIS_HOST=linker-pro-cache.redis.cache.windows.net
+REDIS_PORT=6380
+REDIS_PASSWORD=YOUR_REDIS_PRIMARY_KEY_HERE
+REDIS_TLS=true
+```
+
+### JWT Secrets (generate new ones)
+
+```bash
+# Generate random 32-byte secrets:
+openssl rand -base64 32
+```
+
+```
+JWT_SECRET=random_32_byte_base64_string_here
+JWT_REFRESH_SECRET=another_random_32_byte_string
+JWT_EXPIRES_IN=15m
+JWT_REFRESH_EXPIRES_IN=7d
+```
+
+### Encryption (32-char hex key)
+
+```bash
+# Generate:
+openssl rand -hex 16
+```
+
+```
+ENCRYPTION_KEY=your_32_character_hex_key_string_here
+```
+
+### OpenAI (get API key from https://platform.openai.com/api-keys)
+
+```
+OPENAI_API_KEY=sk-your-openai-api-key-here
+```
+
+### Frontend & Webhooks
+
+```
+FRONTEND_URL=https://linker-pro-frontend.azurewebsites.net
+WEBHOOK_BASE_URL=https://linker-pro-backend.azurewebsites.net/api/v1/webhooks
+```
+
+### Platform OAuth Credentials
+
+Get these from each platform's developer dashboard:
+
+#### Shopify
+
+```
+SHOPIFY_CLIENT_ID=your_shopify_app_id
+SHOPIFY_CLIENT_SECRET=your_shopify_app_secret
+SHOPIFY_SCOPES=read_products,write_products,read_inventory,write_inventory,read_orders
+```
+
+#### Salla
+
+```
+SALLA_CLIENT_ID=your_salla_app_id
+SALLA_CLIENT_SECRET=your_salla_app_secret
+SALLA_SCOPES=offline_access
+```
+
+#### Amazon SP-API
+
+```
+AMAZON_CLIENT_ID=your_amazon_app_id
+AMAZON_CLIENT_SECRET=your_amazon_app_secret
+AMAZON_IAM_ARN=arn:aws:iam::123456789:role/yourRole
+```
+
+#### Zid
+
+```
+ZID_CLIENT_ID=your_zid_app_id
+ZID_CLIENT_SECRET=your_zid_app_secret
+```
+
+#### TikTok Shop
+
+```
+TIKTOK_APP_KEY=your_tiktok_app_key
+TIKTOK_APP_SECRET=your_tiktok_app_secret
+```
+
+#### eBay
+
+```
+EBAY_CLIENT_ID=your_ebay_app_id
+EBAY_CLIENT_SECRET=your_ebay_app_secret
+```
+
+#### Etsy
+
+```
+ETSY_API_KEY=your_etsy_api_key
+ETSY_SHARED_SECRET=your_etsy_shared_secret
+```
+
+#### Walmart
+
+```
+WALMART_CLIENT_ID=your_walmart_merchant_id
+WALMART_CLIENT_SECRET=your_walmart_client_secret
+```
+
+#### MercadoLibre
+
+```
+MERCADOLIBRE_CLIENT_ID=your_ml_app_id
+MERCADOLIBRE_CLIENT_SECRET=your_ml_app_secret
+```
+
+#### AliExpress
+
+```
+ALIEXPRESS_APP_KEY=your_aliexpress_app_key
+ALIEXPRESS_APP_SECRET=your_aliexpress_app_secret
+```
+
+#### WooCommerce & Magento
+
+These are per-store, not global. Add credentials in the app when connecting.
+
+---
+
+## Add to Azure CLI
+
+All at once:
+
+```bash
+az webapp config appsettings set \
+  --resource-group linker-pro-rg \
+  --name linker-pro-backend \
+  --settings \
+    NODE_ENV=production \
+    PORT=3000 \
+    DATABASE_URL="postgresql://linkerpro:YourStrongPassword123!@linker-pro-db.postgres.database.azure.com:5432/linker_pro?sslmode=require" \
+    REDIS_HOST=linker-pro-cache.redis.cache.windows.net \
+    REDIS_PORT=6380 \
+    REDIS_PASSWORD=YOUR_REDIS_PRIMARY_KEY \
+    REDIS_TLS=true \
+    JWT_SECRET=GENERATED_SECRET \
+    JWT_REFRESH_SECRET=GENERATED_SECRET \
+    ENCRYPTION_KEY=GENERATED_KEY \
+    OPENAI_API_KEY=sk-your-key \
+    FRONTEND_URL=https://linker-pro-frontend.azurewebsites.net \
+    WEBHOOK_BASE_URL=https://linker-pro-backend.azurewebsites.net/api/v1/webhooks
+```

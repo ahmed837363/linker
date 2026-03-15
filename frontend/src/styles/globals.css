@@ -1,0 +1,90 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: #ffffff;
+    --foreground: #0F172A;
+    --sidebar-width: 260px;
+    --topbar-height: 64px;
+  }
+
+  body {
+    @apply bg-dashboard-dark text-dashboard-text antialiased;
+  }
+
+  * {
+    @apply border-dashboard-border;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-dashboard-card/80 backdrop-blur-xl border border-dashboard-border rounded-xl;
+  }
+
+  .gradient-primary {
+    @apply bg-gradient-to-r from-primary-600 to-primary-500;
+  }
+
+  .gradient-accent {
+    @apply bg-gradient-to-r from-accent-600 to-accent-500;
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary-400 to-accent-400;
+  }
+
+  .input-base {
+    @apply w-full px-3 py-2 bg-dashboard-dark border border-dashboard-border rounded-lg
+           text-dashboard-text placeholder:text-dashboard-muted/50
+           focus:outline-none focus:ring-2 focus:ring-primary-600/50 focus:border-primary-600
+           transition-all duration-200;
+  }
+
+  .sidebar-link {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+           text-dashboard-muted hover:text-dashboard-text hover:bg-dashboard-hover
+           transition-all duration-200;
+  }
+
+  .sidebar-link-active {
+    @apply text-white bg-primary-600/20 border-l-2 border-primary-500;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: theme('colors.dashboard.hover') transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: theme('colors.dashboard.hover');
+    border-radius: 3px;
+  }
+}
+
+@layer utilities {
+  .animate-in {
+    animation: animateIn 0.3s ease-out forwards;
+  }
+
+  @keyframes animateIn {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
