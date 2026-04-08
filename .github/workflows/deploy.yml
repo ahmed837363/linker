@@ -7,17 +7,15 @@ on:
 
 env:
   AZURE_WEBAPP_BACKEND: linker-pro-backend    # Change to your App Service name
-  AZURE_WEBAPP_FRONTEND: linker-pro-frontend  # Change to your App Service name
   REGISTRY: ghcr.io
   BACKEND_IMAGE: ghcr.io/${{ github.repository }}/backend
-  FRONTEND_IMAGE: ghcr.io/${{ github.repository }}/frontend
 
 permissions:
   contents: read
   packages: write
 
 jobs:
-  # ─── Build & Push Docker Images ────────────────────
+  # ─── Build & Push Backend Docker Image ─────────────
   build-backend:
     runs-on: ubuntu-latest
     steps:
@@ -39,52 +37,9 @@ jobs:
             ${{ env.BACKEND_IMAGE }}:latest
             ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
 
-  build-frontend:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push frontend image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./frontend
-          push: true
-          tags: |
-            ${{ env.FRONTEND_IMAGE }}:latest
-            ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
-
-  # ─── Run Database Migrations ───────────────────────
-  migrate:
-    needs: build-backend
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Install dependencies
-        working-directory: ./backend
-        run: npm ci
-
-      - name: Run Prisma migrations
-        working-directory: ./backend
-        run: npx prisma migrate deploy
-        env:
-          DATABASE_URL: ${{ secrets.AZURE_DATABASE_URL }}
-
   # ─── Deploy to Azure ───────────────────────────────
   deploy-backend:
-    needs: [build-backend, migrate]
+    needs: [build-backend]
     runs-on: ubuntu-latest
     steps:
       - name: Login to Azure
@@ -97,18 +52,3 @@ jobs:
         with:
           app-name: ${{ env.AZURE_WEBAPP_BACKEND }}
           images: ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
-
-  deploy-frontend:
-    needs: build-frontend
-    runs-on: ubuntu-latest
-    steps:
-      - name: Login to Azure
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      - name: Deploy frontend to Azure App Service
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: ${{ env.AZURE_WEBAPP_FRONTEND }}
-          images: ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
