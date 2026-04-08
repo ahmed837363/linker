@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Building2, User, Mail, Lock, ArrowRight, Loader2 } from 'lucide-react';
+import { Building2, User, Mail, Lock, ArrowRight, Loader2, Play } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuthStore } from '@/stores/auth.store';
 import toast from 'react-hot-toast';
@@ -164,6 +164,30 @@ export default function RegisterPage() {
           )}
         </motion.button>
       </form>
+
+      {/* Demo divider */}
+      <div className="relative my-6">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-dashboard-border" />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-dashboard-card px-2 text-dashboard-muted">or</span>
+        </div>
+      </div>
+
+      {/* Demo button */}
+      <motion.button
+        whileHover={{ scale: 1.01 }}
+        whileTap={{ scale: 0.99 }}
+        type="button"
+        onClick={() => router.push('/demo')}
+        className="w-full flex items-center justify-center gap-2 px-4 py-2.5
+                   bg-emerald-600/20 border border-emerald-500/30 text-emerald-400
+                   font-medium rounded-lg hover:bg-emerald-600/30 transition-all"
+      >
+        <Play className="w-4 h-4" />
+        Try Demo — No Account Needed
+      </motion.button>
 
       <p className="text-center text-sm text-dashboard-muted mt-6">
         Already have an account?{' '}

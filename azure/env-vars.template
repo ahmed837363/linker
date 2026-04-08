@@ -18,6 +18,17 @@ API_PREFIX=api/v1
 DATABASE_URL=postgresql://linkerpro:YourStrongPassword123!@linker-pro-db.postgres.database.azure.com:5432/linker_pro?sslmode=require
 ```
 
+### Optional Appwrite mirror (PostgreSQL remains primary)
+
+```
+APPWRITE_MIRROR_ENABLED=false
+APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1
+APPWRITE_PROJECT_ID=your_appwrite_project_id
+APPWRITE_API_KEY=your_appwrite_api_key
+APPWRITE_DATABASE_ID=your_appwrite_database_id
+APPWRITE_COLLECTION_PREFIX=lp_
+```
+
 ### Redis (from Step 4)
 
 ```
